@@ -1,0 +1,1964 @@
+<!DOCTYPE html>
+<html lang="de">
+	<head>
+		<title>numaek - nWarp</title>
+		<META charset="utf-8">
+
+	</head>
+
+ <body style="background-color: #000000; color: white;">
+
+ <script language="javascript">
+
+
+ /* 
+  * Warpflug
+  * --------
+  * 
+  * Script:        nWarp
+  * 
+  * Version:       1.0
+  * Release:       01.11.2019
+  * 
+  * Author:        numaek   
+  * Copyright (c): 2004-2019 by www.numaek.de
+  * 
+  * *************************************************************************************************************************************************************************************************
+  */
+
+
+    // Konfiguration
+    // =============
+
+    var nStars = [];
+
+	// Flug
+	// ----
+	nStars['id']         = 'myCanvas';			// Element-ID des Canvas
+	nStars['margin']     = 20;				// Abstand des Canvas zum Bildschirmrand
+	nStars['resize']     = 1;				// Canvas passt sich an die Browsergröße an
+
+	nStars['stars']      = 500;				// Anzahl der Sterne
+	nStars['delay']      = 20;				// Programm-Geschwindigkeit
+	nStars['radius']     = 1.5;				// Maximaler Radius eines Sterns
+	nStars['speed']      = 1.5;				// Geschwindigkeit eines Sterns
+
+	nStars['stripes']    = 1;				// Sterne mit Streifen
+	nStars['start']      = 1;				// Starteffekt mit langen Streifen
+	nStars['warp']       = 3;				// Warp-Faktor zu Beginn
+	nStars['steer']      = 3;				// Ausschlag beim Steuern
+	nStars['display']    = 1;				// Display & Waffen anzeigen
+
+	nStars['coloured']   = 1;				// Farbige Sterne - Farben können ergänzt oder gekürzt werden
+	nStars['colors']     = new Array('#FFFFFF', '#FFFF00', '#FFA500', '#FF0000', '#0000FF', '#00FFFF');
+
+	// Gegner
+	// ------
+	nStars['enemies']               = 1;			// Gegnerische Schiffe anzeigen
+
+	nStars['ships']                 = [];
+	nStars['ships']['count']        = 4;			// Anzahl der Gegner
+	nStars['ships']['image_url']    = 'gegner.png';		// Bild des Gegners
+	nStars['ships']['image_width']  = 126;			// Dessen Breite
+	nStars['ships']['image_height'] = 62;			// Dessen Höhe
+
+	nStars['attack']                = [];
+	nStars['attack']['fire']        = 10000;		// Max. Schussfrequenz in Millisekunden
+	nStars['attack']['damage']      = 5;			// Schaden durch gegnerischen Treffer
+
+
+    // ==============================================================================================================================================================================================
+
+
+	nStars['schild']     = 100;
+	nStars['rumpf']      = 100;
+	nStars['run']        = 1;
+	nStars['init']       = 0;
+	nStars['maxRange']   = 0;
+	nStars['countLoop']  = 0;
+	nStars['firstLoop']  = 1;
+	nStars['scanner']    = 0;
+	nStars['textCount']  = 0;
+	nStars['textMemo']   = '';
+	nStars['coreLoop']   = 0;
+	nStars['coreOn']     = 0;
+	nStars['starRot']    = 0;
+	nStars['goPos']      = 0;
+	nStars['gameOver']   = 0;
+	nStars['explosion']  = 0;
+
+	nStars['dir']        = new Array(0,0,0,0);		// Tasten: links, rechts, oben, unten
+	nStars['flightKeys'] = new Array(37,38,39,40,65,68,83,87);
+
+	nStars['weapons']    = new Array('Laser', 'Phaser', 'Torpedo');
+
+	nStars['flight']     = [];
+	nStars['pos']        = [];
+	nStars['crack']      = [];
+
+	nStars['timer'];
+	nStars['timerEx'];
+
+	nStars['shot']            = [];
+	nStars['shot']['active']  = 0;
+	nStars['shot']['steps_l'] = 10;
+	nStars['shot']['steps_t'] = 20;
+	nStars['shot']['x']       = 0;
+	nStars['shot']['y']       = 0;
+	nStars['shot']['trigger'] = 0;
+	nStars['shot']['heat']    = 0;
+	nStars['shot']['weapon']  = 'Laser';
+
+	nStars['ships']['hits']   = 0;
+	nStars['ships']['wait']   = 0;
+
+	nStars['mouseOver']       = 0;
+	nStars['mousePosX']       = 0;
+	nStars['mousePosY']       = 0;
+
+
+	// Ereignisse überwachen
+	// =====================
+	  window.addEventListener("resize",    nWarpResize,    true);
+
+	document.addEventListener("keydown",   nWarpKeyDown,   true);
+	document.addEventListener("keyup",     nWarpKeyUp,     true);
+
+	document.addEventListener("mousedown", nWarpMouseDown, true);
+	document.addEventListener("mouseup",   nWarpMouseUp,   true);
+	document.addEventListener("mousemove", nWarpMouseMove, true);
+
+
+	// Maustaste drücken
+	// *****************
+	function nWarpMouseDown(event)
+	{
+		if( nStars['gameOver'] == 1 )
+		{
+			location.reload();
+			return;
+		}
+
+		if( nStars['display'] == 1 )
+		{
+			if( event.target.id != nStars['id'] ) { return; }
+
+			if( nStars['shot']['active'] > 0    ) { return; } 		// Abkühlung läuft noch
+
+			if( event.offsetY < nStars['height'] - 100 )
+			{
+				// Schuss initialisieren
+				// =====================
+				nStars['shot']['baseLx']  = 200;			// Waffenposition X links
+				nStars['shot']['baseLy']  = nStars['height'] - 100;	// Waffenposition Y links
+
+				nStars['shot']['baseMx']  = nStars['mpX'];		// Waffenposition X mitte
+				nStars['shot']['baseMy']  = nStars['height'] - 100;	// Waffenposition Y mitte
+
+				nStars['shot']['baseRx']  = nStars['width']  - 200;	// Waffenposition X rechts
+				nStars['shot']['baseRy']  = nStars['height'] - 100;	// Waffenposition Y rechts
+
+				nStars['shot']['alpha']   = 0;
+				nStars['shot']['beta']    = 0;
+				nStars['shot']['gamma']   = 0;
+
+				nStars['shot']['loops']   = 0;
+				nStars['shot']['active']  = 50;
+
+				nStars['shot']['x']       = event.offsetX;
+				nStars['shot']['y']       = event.offsetY;
+				nStars['shot']['y']       = ( nStars['shot']['y'] > ( nStars['height'] - 100 ) ) ? nStars['height'] - 100 : nStars['shot']['y'];	// Höhenbegrenzung bis Cockpit
+
+				// Winkel linker Punkt; Gesamt- und Teilstrecke für Schussverlauf berechnen
+				// ========================================================================
+				if( nStars['shot']['x'] >= nStars['shot']['baseLx'] )
+				{
+					gesBetragLx             = nStars['shot']['x']      - nStars['shot']['baseLx'];
+					gesBetragLy             = nStars['shot']['baseLy'] - nStars['shot']['y'];
+					einBetragLx             = gesBetragLx / nStars['shot']['steps_l'];
+					einBetragLy             = gesBetragLy / nStars['shot']['steps_l'];
+					nStars['shot']['alpha'] = Math.atan( gesBetragLy / gesBetragLx );
+				} else
+				  {
+					gesBetragLx             = nStars['shot']['baseLx'] - nStars['shot']['x'];
+					gesBetragLy             = nStars['shot']['baseLy']  - nStars['shot']['y'];
+					einBetragLx             = gesBetragLx / nStars['shot']['steps_l'];
+					einBetragLy             = gesBetragLy / nStars['shot']['steps_l'];
+					nStars['shot']['alpha'] = Math.atan( gesBetragLy / gesBetragLx );
+				  }
+
+				// Winkel rechter Punkt; Gesamt- und Teilstrecke für Schussverlauf berechnen
+				// =========================================================================
+				if( nStars['shot']['x'] >= nStars['shot']['baseRx'] )
+				{
+					gesBetragRx             = nStars['shot']['x']      - nStars['shot']['baseRx'];
+					gesBetragRy             = nStars['shot']['baseRy'] - nStars['shot']['y'];
+					einBetragRx             = gesBetragRx / nStars['shot']['steps_l'];
+					einBetragRy             = gesBetragRy / nStars['shot']['steps_l'];
+					nStars['shot']['gamma'] = Math.atan( gesBetragRy / gesBetragRx );
+				} else
+				  {
+					gesBetragRx             = nStars['shot']['baseRx'] - nStars['shot']['x'];
+					gesBetragRy             = nStars['shot']['baseRy'] - nStars['shot']['y'];
+					einBetragRx             = gesBetragRx / nStars['shot']['steps_l'];
+					einBetragRy             = gesBetragRy / nStars['shot']['steps_l'];
+					nStars['shot']['gamma'] = Math.atan( gesBetragRy / gesBetragRx );
+				  }
+
+				// Winkel mittlerer Punkt; Gesamt- und Teilstrecke für Schussverlauf berechnen
+				// ===========================================================================
+				if( nStars['shot']['x'] >= nStars['shot']['baseMx'] )
+				{
+					gesBetragMx             = nStars['shot']['x']      - nStars['shot']['baseMx'];
+					gesBetragMy             = nStars['shot']['baseMy'] - nStars['shot']['y'];
+					einBetragMx             = gesBetragMx / nStars['shot']['steps_t'];
+					einBetragMy             = gesBetragMy / nStars['shot']['steps_t'];
+					nStars['shot']['beta']  = Math.atan( gesBetragMy / gesBetragMx );
+				} else
+				  {
+					gesBetragMx             = nStars['shot']['baseMx'] - nStars['shot']['x'];
+					gesBetragMy             = nStars['shot']['baseMy'] - nStars['shot']['y'];
+					einBetragMx             = gesBetragMx / nStars['shot']['steps_t'];
+					einBetragMy             = gesBetragMy / nStars['shot']['steps_t'];
+					nStars['shot']['beta']  = Math.atan( gesBetragMy / gesBetragMx );
+				  }
+
+				// Phaser halten aktivieren
+				// ========================
+				if( nStars['shot']['heat'] < 1 )
+				{
+					nStars['shot']['trigger'] = 1;
+				}
+
+				// Hitze beim Laser hinzufügen
+				// ===========================
+				if( nStars['shot']['weapon'] == 'Laser' )
+				{
+					nStars['shot']['heat'] = ( nStars['shot']['heat'] < 1 ) ? nStars['shot']['heat'] + 0.35 : 1;
+					nStars['shot']['heat'] = ( nStars['shot']['heat'] > 1 ) ? 1 : nStars['shot']['heat'];
+				}
+			}
+		}
+	}
+
+
+	// Maustaste loslassen
+	// *******************
+	function nWarpMouseUp(event)
+	{
+		// Phaser halten deaktivieren
+		// ==========================
+		if( nStars['shot']['weapon'] == 'Phaser' )
+		{
+			nStars['shot']['trigger'] = 0;
+			nStars['shot']['active']  = 0;
+		}
+
+		if( event.offsetX >= 30 && event.offsetX <= 130 && event.offsetY >= nStars['height']-60 && event.offsetY <= nStars['height']-20 )
+		{
+			nWarpRun();
+		}
+
+		if( event.offsetX >= 150 && event.offsetX <= 165 && event.offsetY >= nStars['height']-60 && event.offsetY <= nStars['height']-45 )
+		{
+			nWarpColors();
+		}
+
+		if( event.offsetX >= 150 && event.offsetX <= 165 && event.offsetY >= nStars['height']-35 && event.offsetY <= nStars['height']-20 )
+		{
+			nWarpStripes();
+		}
+
+		if( event.offsetX >= nStars['width']-165 && event.offsetX <= nStars['width']-95 && event.offsetY >= nStars['height']-62 && event.offsetY <= nStars['height']-44 )
+		{
+			nWarpWeapon();
+		}
+
+		if( event.offsetX >= ((nStars['width']/2)-40) && event.offsetX <= ((nStars['width']/2)+40) && event.offsetY >= nStars['height']-90 && event.offsetY <= nStars['height']-10 )
+		{
+			nWarpShipSwitch();
+		}
+
+		if( event.offsetX >= 190 && event.offsetX <= 310 && event.offsetY >= nStars['height']-31 && event.offsetY <= nStars['height']-9 )
+		{
+			window.open('http://www.numaek.de');
+		}
+	}
+
+
+	// Mausbewegung
+	// ************
+	function nWarpMouseMove(event)
+	{
+		if( event.target.id != nStars['id'] ) { return; }
+
+		// Phaser Zielpunkt an Maus anpassen
+		// =================================
+		if( nStars['shot']['active'] > 0 && nStars['shot']['trigger'] == 1 && nStars['shot']['weapon'] == 'Phaser' )
+		{
+			nStars['shot']['x'] = event.offsetX;
+			nStars['shot']['y'] = event.offsetY;
+			nStars['shot']['y'] = ( nStars['shot']['y'] > ( nStars['height'] - 100 ) ) ? nStars['height'] - 100 : nStars['shot']['y'];	// Höhenbegrenzung bis Cockpit
+		}
+
+		// Mausposition speichern
+		// ======================
+		nStars['mousePosX'] = event.offsetX;
+		nStars['mousePosY'] = event.offsetY;
+
+		window.getSelection().removeAllRanges();
+	}
+
+
+	// Waffen umschalten
+	// *****************
+	function nWarpWeapon()
+	{
+		weaponPos                = nStars['weapons'].indexOf(nStars['shot']['weapon']);
+		nStars['shot']['weapon'] = ( weaponPos < ( nStars['weapons'].length -1 ) ) ? nStars['weapons'][(weaponPos+1)] : nStars['weapons'][0];
+	}
+
+
+	// Tastensteuerung Taste loslassen
+	// *******************************
+	function nWarpKeyUp(event)
+	{
+		if( !event ) { event = window.event; }
+		userKey = event.keyCode; // console.log(userKey);
+
+		if( userKey ==  80 ) { nWarpRun();        }	// Taste "P" zum Pausieren der Hauptfunktion
+
+		if( userKey ==  72 ) { nWarpHelp();       }	// Taste "H" zur Hilfe
+
+		if( userKey ==  70 ) { nWarpColors();     }	// Taste "F" zur Umschaltung der Farben
+		if( userKey ==  86 ) { nWarpStripes();    }	// Taste "V" zur Umschaltung der Verzögerungs-Streifen
+
+		if( userKey ==  69 ) { nWarpSpeed('+');   }	// Taste "E" zum schneller fliegen
+		if( userKey ==  81 ) { nWarpSpeed('-');   }	// Taste "Q" zum langsamer fliegen
+
+		if( userKey ==  32 ) { nWarpWeapon();     }	// Taste "SPACE" zum Umschalten der Waffen
+
+		if( userKey ==  71 ) { nWarpShipSwitch(); }	// Taste "G" zum Ein- und Ausschalten der Gegner
+
+		if( nStars['flightKeys'].indexOf(userKey) != -1 ) { nWarpSteer('up',   userKey); } // Flugsteuerungstasten
+	}
+
+
+	// Tastensteuerung Taste drücken
+	// *****************************
+	function nWarpKeyDown(event)
+	{
+		if( !event ) { event = window.event; }
+		userKey = event.keyCode
+
+		if( nStars['flightKeys'].indexOf(userKey) != -1 ) { nWarpSteer('down', userKey); } // Flugsteuerungstasten
+	}
+
+
+	// Hauptfunktion - Canvas zeichnen
+	// *******************************
+	function nWarp()
+	{
+		if( !document.getElementById(nStars['id']) || nStars['gameOver'] == 1 ) { return; }
+
+		nStars['canvas'] = document.getElementById(nStars['id']);
+		ctx              = nStars['canvas'].getContext('2d');
+
+		if( nStars['resize'] == 1 )
+		{
+			nStars['canvas'].width  = window.innerWidth  - nStars['margin'];
+			nStars['canvas'].height = window.innerHeight - nStars['margin'];
+		}
+
+		ctx.lineWidth    = 1;
+		ctx.font         = '13px Verdana';
+		ctx.fillStyle    = '#000000';
+		ctx.clearRect(0, 0, nStars['canvas'].width, nStars['canvas'].height);
+		ctx.fillRect( 0, 0, nStars['canvas'].width, nStars['canvas'].height);
+
+		// Permanent die Sterne bewegen und zeichnen
+		// =========================================
+		if( nStars['init'] > 0 )
+		{
+			// Flugsteuerung - Mittelpunkt abhängig vom Warpfaktor verschieben und beim Loslassen wieder zur Mitte wandern lassen
+			// ==================================================================================================================
+			nStars['flight']['mpOffsetMax'] = ( nStars['warp'] <= 10 ) ? ( nStars['steer'] * 44 * 0.1 * nStars['warp'] ) : ( nStars['steer'] * 44 );
+			nStars['flight']['mpStep']      = 2.5;
+
+			// Auslenkung horizontal
+			if( nStars['dir'][0] == 1 && nStars['dir'][1] == 0 )
+			{
+				// nach links
+				nStars['flight']['mpOffsetX'] = ( nStars['flight']['mpOffsetX'] > -nStars['flight']['mpOffsetMax'] ) ? nStars['flight']['mpOffsetX'] - nStars['flight']['mpStep'] : -nStars['flight']['mpOffsetMax'];
+			} else
+			if( nStars['dir'][0] == 0 && nStars['dir'][1] == 1 )
+			{
+				// nach rechts
+				nStars['flight']['mpOffsetX'] = ( nStars['flight']['mpOffsetX'] <  nStars['flight']['mpOffsetMax'] ) ? nStars['flight']['mpOffsetX'] + nStars['flight']['mpStep'] :  nStars['flight']['mpOffsetMax'];
+			} else
+			if( nStars['dir'][0] == 0 && nStars['dir'][1] == 0 )
+			{
+				// zurück zur Mitte
+				if( nStars['flight']['mpOffsetX'] < 0 ) { nStars['flight']['mpOffsetX'] += nStars['flight']['mpStep']; }
+				if( nStars['flight']['mpOffsetX'] > 0 ) { nStars['flight']['mpOffsetX'] -= nStars['flight']['mpStep']; }
+			}
+
+			// Auslenkung vertikal
+			if( nStars['dir'][2] == 1 && nStars['dir'][3] == 0 )
+			{
+				// nach oben
+				nStars['flight']['mpOffsetY'] = ( nStars['flight']['mpOffsetY'] <  nStars['flight']['mpOffsetMax'] ) ? nStars['flight']['mpOffsetY'] + nStars['flight']['mpStep'] :  nStars['flight']['mpOffsetMax'];
+			} else
+			if( nStars['dir'][2] == 0 && nStars['dir'][3] == 1 )
+			{
+				// nach unten
+				nStars['flight']['mpOffsetY'] = ( nStars['flight']['mpOffsetY'] > -nStars['flight']['mpOffsetMax'] ) ? nStars['flight']['mpOffsetY'] - nStars['flight']['mpStep'] : -nStars['flight']['mpOffsetMax'];
+			} else
+			if( nStars['dir'][2] == 0 && nStars['dir'][3] == 0 )
+			{
+				// zurück zur Mitte
+				if( nStars['flight']['mpOffsetY'] < 0 ) { nStars['flight']['mpOffsetY'] += nStars['flight']['mpStep']; }
+				if( nStars['flight']['mpOffsetY'] > 0 ) { nStars['flight']['mpOffsetY'] -= nStars['flight']['mpStep']; }
+			}
+
+			// Bewegen & Zeichnen
+			// ==================
+			for( s = 0; s < nStars['stars']; s++ )
+			{
+				nWarpStarMove(s);
+				nWarpStarDraw(s);
+			}
+
+			// Gegnerische Schiffe bewegen
+			// ===========================
+			if( nStars['enemies'] == 1 && nStars['display'] == 1 )
+			{
+				for( sNr = 0; sNr < nStars['ships']['count']; sNr++ )
+				{
+					nWarpShipMove(sNr);
+				}
+				nStars['ships']['wait'] = ( nStars['ships']['wait'] > 0 ) ? nStars['ships']['wait'] - 1 : 0;	// Phaser Abkühlzeit ablaufen lassen
+			}
+
+			if( nStars['gameOver'] == 0 )
+			{
+				// Risse in der Scheibe zeichnen
+				// =============================
+				for( r = 0; r < nStars['crack'].length; r++ )
+				{
+					ctx.strokeStyle = '#EFEFEF';
+					for( rd = 0; rd < nStars['crack'][r]['alpha'].length; rd++ )
+					{
+						crackX = nStars['crack'][r]['x'] + Math.cos( nStars['crack'][r]['alpha'][rd] ) * nStars['crack'][r]['range'][rd] * nStars['maxRange'];
+						crackY = nStars['crack'][r]['y'] + Math.sin( nStars['crack'][r]['alpha'][rd] ) * nStars['crack'][r]['range'][rd] * nStars['maxRange'];
+						ctx.beginPath(); ctx.moveTo(nStars['crack'][r]['x'], nStars['crack'][r]['y']); ctx.lineTo(crackX, crackY); ctx.stroke(); ctx.closePath();
+					}
+				}
+
+				// Cockpit anzeigen
+				// ================
+				if( nStars['display'] == 1 )
+				{
+					// Hintergrund
+					// ===========
+					ctx.strokeStyle = '#505050';
+					ctx.fillStyle   = '#505050';
+
+					ctx.beginPath();
+					ctx.moveTo(  0, nStars['height']);
+					ctx.lineTo(  0, nStars['height']-40);
+					ctx.lineTo(175, nStars['height']-100);
+					ctx.lineTo(175, nStars['height']);
+					ctx.lineTo(  0, nStars['height']);
+					ctx.stroke(); ctx.fill(); ctx.closePath();
+
+					ctx.beginPath();
+					ctx.moveTo(nStars['width'],     nStars['height']);
+					ctx.lineTo(nStars['width'],     nStars['height']-40);
+					ctx.lineTo(nStars['width']-175, nStars['height']-100);
+					ctx.lineTo(nStars['width']-175, nStars['height']);
+					ctx.lineTo(nStars['width'],     nStars['height']);
+					ctx.stroke(); ctx.fill(); ctx.closePath();
+
+					ctx.fillRect(175, nStars['height']-100, nStars['width']-(175*2), 100);
+
+					// Linke Seite
+					// ===========
+					nStars['flight']['dispAn']  = ( nStars['warp'] > 10 ) ? 100 : ( nStars['warp'] * 10 );
+					nStars['flight']['dispGeg'] = nStars['flight']['dispAn'] * Math.tan( 0.3 );
+					nStars['flight']['anMax']   = 100;
+					nStars['flight']['gegMax']  = 100 * Math.tan( 0.3 );
+
+					ctx.strokeStyle = 'rgba(255, 0, 0, 0.3)';
+					ctx.fillStyle   = 'rgba(255, 0, 0, 0.3)';
+
+					ctx.beginPath();
+					ctx.moveTo(30,                           nStars['height']-20);
+					ctx.lineTo(30,                           nStars['height']-30);
+					ctx.lineTo(30+nStars['flight']['anMax'], nStars['height']-30-nStars['flight']['gegMax']);
+					ctx.lineTo(30+nStars['flight']['anMax'], nStars['height']-20);
+					ctx.stroke(); ctx.fill(); ctx.closePath();
+
+					if( nStars['warp'] == 13 )
+					{
+						ctx.strokeStyle = 'rgba(255, 255,   0, 0.6)';
+						ctx.fillStyle   = 'rgba(255, 255,   0, 0.6)';
+					} else
+					if( nStars['warp'] == 12 )
+					{
+						ctx.strokeStyle = 'rgba(  0, 255, 255, 0.6)';
+						ctx.fillStyle   = 'rgba(  0, 255, 255, 0.6)';
+					} else
+					if( nStars['warp'] == 11 )
+					{
+						ctx.strokeStyle = 'rgba(  0, 255,   0, 0.6)';
+						ctx.fillStyle   = 'rgba(  0, 255,   0, 0.6)';
+					} else
+					  {
+						ctx.strokeStyle = 'rgba(255,   0,   0, 0.6)';
+						ctx.fillStyle   = 'rgba(255,   0,   0, 0.6)';
+					  }
+
+					ctx.beginPath();
+					ctx.moveTo(30,                            nStars['height']-20);
+					ctx.lineTo(30,                            nStars['height']-30);
+					ctx.lineTo(30+nStars['flight']['dispAn'], nStars['height']-30-nStars['flight']['dispGeg']);
+					ctx.lineTo(30+nStars['flight']['dispAn'], nStars['height']-20);
+					ctx.stroke(); ctx.fill(); ctx.closePath();
+
+					ctx.font      = '10px Verdana';
+					ctx.fillStyle = '#FFFFFF';
+					if( nStars['warp'] <  10 )
+					{
+						nStars['flight']['warpText'] = nStars['warp']
+					} else
+					if( nStars['warp'] == 10 )
+					{
+						nStars['flight']['warpText'] = '9,9';
+					} else
+					  {
+						nStars['flight']['warpText'] = '10+';
+					  }
+					ctx.fillText(nStars['flight']['warpText'], 31, nStars['height']-22);
+
+					ctx.fillStyle   = ( nStars['coloured'] == 1 ) ? 'rgba(  0, 255,   0, 0.9)' : 'rgba(  0, 255,   0, 0.3)';
+					ctx.fillRect(150, nStars['height']-60, 15, 15);
+					ctx.fillStyle   = ( nStars['stripes']  == 1 ) ? 'rgba(255, 255, 255, 0.9)' : 'rgba(255, 255, 255, 0.3)';
+					ctx.fillRect(150, nStars['height']-35, 15, 15);
+					ctx.font        = '12px Verdana';
+					ctx.fillStyle   = 'rgba(  0,   0,   0, 1)';
+					ctx.fillText('F', 153, nStars['height']-48);
+					ctx.fillText('V', 153, nStars['height']-23);
+
+					// Text-Display
+					// ============
+					ctx.fillStyle   = 'rgba(0, 0, 0, 1)';
+					ctx.fillRect(  190, nStars['height']-86, 120, 55);
+					ctx.fillRect(  190, nStars['height']-31, 120, 22);
+					ctx.lineWidth   = 1;
+					ctx.strokeStyle = 'rgba(0, 255, 255, 1)';
+					ctx.strokeRect(190, nStars['height']-86, 120, 55);
+					ctx.strokeRect(190, nStars['height']-31, 120, 22);
+					ctx.font        = '12px Verdana';
+					ctx.fillStyle   = '#00FFFF';
+					ctx.fillText('"H" = Hilfe',                      197, nStars['height']-70);
+					ctx.fillText('Gegner: '+nStars['ships']['hits'], 197, nStars['height']-54);
+					ctx.fillText('www.numaek.de',                    197, nStars['height']-15);
+
+					// Scanner
+					// =======
+					ctx.fillStyle     = 'rgb(0, 0, 0)';
+					ctx.beginPath(); ctx.arc(nStars['width']/2, nStars['height']-50, 40, 0, 2*Math.PI, false); ctx.fill();   ctx.closePath();
+					ctx.lineWidth     = 2;
+					ctx.strokeStyle   = 'rgba(0, 255, 255, 1)';
+					ctx.beginPath(); ctx.arc(nStars['width']/2, nStars['height']-50, 40, 0, 2*Math.PI, false); ctx.stroke(); ctx.closePath();
+					ctx.fillStyle     = 'rgba(0, 255, 255, 0.6)';
+					ctx.strokeStyle   = 'rgba(0, 255, 255, 0.3)';
+					ctx.beginPath(); ctx.arc(nStars['width']/2, nStars['height']-50, 30, 0, 2*Math.PI, false); ctx.stroke(); ctx.closePath();
+					ctx.beginPath(); ctx.arc(nStars['width']/2, nStars['height']-50, 20, 0, 2*Math.PI, false); ctx.stroke(); ctx.closePath();
+					ctx.beginPath(); ctx.arc(nStars['width']/2, nStars['height']-50, 10, 0, 2*Math.PI, false); ctx.stroke(); ctx.closePath();
+					ctx.beginPath(); ctx.arc(nStars['width']/2, nStars['height']-50,  3, 0, 2*Math.PI, false); ctx.fill();   ctx.closePath();
+
+					nStars['scanner'] = ( nStars['scanner'] < 40 ) ? nStars['scanner'] + 0.5 + ( nStars['warp'] / 10 ) : 0;
+					ctx.lineWidth     = 1;
+					ctx.strokeStyle   = 'rgba(0, 255, 255, 1)';
+					ctx.beginPath(); ctx.arc(nStars['width']/2, nStars['height']-50, nStars['scanner'], 0, 2*Math.PI, false); ctx.stroke(); ctx.closePath();
+
+					if( nStars['enemies'] == 1 )
+					{
+						ctx.strokeStyle   = 'rgba(255, 0, 0, 1)';
+						ctx.fillStyle     = 'rgba(255, 0, 0, 1)';
+						for( sNr = 0; sNr < nStars['ships']['count']; sNr++ )
+						{
+							if( nStars['ships'][sNr]['active'] != 0 )
+							{
+								// Die Daten der echten Schiffe auf Scannergröße runterrechnen
+								rangeFactor = nStars['ships'][sNr]['range'] / nStars['maxRange'];
+								rangeFactor = ( rangeFactor > 1 ) ? 1 : rangeFactor;
+								sx          = ( nStars['width']  /  2 ) + Math.cos( nStars['ships'][sNr]['alpha'] ) * 40 * rangeFactor;
+								sy          = ( nStars['height'] - 50 ) + Math.sin( nStars['ships'][sNr]['alpha'] ) * 40 * rangeFactor;
+								ctx.beginPath(); ctx.arc(sx, sy, 1.5, 0, 2*Math.PI, false); ctx.stroke(); ctx.fill(); ctx.closePath();
+							}
+						}
+					}
+
+					// LCARS
+					// =====
+					lcarsBaseX      = nStars['width']  - 310;
+					lcarsBaseY      = nStars['height'] -  86;
+					ctx.fillStyle   = 'rgba(  0,   0,   0, 1)'; ctx.fillRect( lcarsBaseX - 4,          lcarsBaseY - 4,       120, 80);
+
+					ctx.fillStyle   = 'rgba(  0, 255,   0, 1)'; ctx.fillRect( lcarsBaseX,              lcarsBaseY,             6, 10);
+					ctx.lineWidth   = 6; ctx.beginPath();
+					ctx.strokeStyle = 'rgba(  0, 255,   0, 1)'; ctx.arc(      lcarsBaseX + 6 + 7,      lcarsBaseY + 10, 10, Math.PI, 0.5*Math.PI, true);
+					ctx.stroke(); ctx.closePath();
+					ctx.fillStyle   = 'rgba(200, 200,   0, 1)'; ctx.fillRect( lcarsBaseX + 6 + 7,      lcarsBaseY + 10 + 7,   55,  6);
+				//	ctx.fillStyle   = 'rgba(255,   0,   0, 1)'; ctx.fillRect( lcarsBaseX + 6 + 7 + 57, lcarsBaseY + 10 + 7,    5,  6);
+					ctx.fillStyle   = 'rgba(176, 196, 222, 1)'; ctx.fillRect( lcarsBaseX + 6 + 7 + 64, lcarsBaseY + 10 + 7,   34,  6);
+
+					ctx.fillStyle   = 'rgba(  0, 255, 255, 1)'; ctx.fillRect( lcarsBaseX,              lcarsBaseY + 38,        6, 36);
+					ctx.lineWidth   = 6; ctx.beginPath();
+					ctx.strokeStyle = 'rgba(  0, 255, 255, 1)'; ctx.arc(      lcarsBaseX + 6 + 7,      lcarsBaseY + 38, 10, Math.PI, 1.5*Math.PI, false);
+					ctx.stroke(); ctx.closePath();
+					ctx.fillStyle   = 'rgba(200, 200,   0, 1)'; ctx.fillRect( lcarsBaseX + 6 + 7,      lcarsBaseY + 40 - 15,  55,  6);
+					ctx.fillStyle   = 'rgba(255,   0,   0, 1)'; ctx.fillRect( lcarsBaseX + 6 + 7 + 57, lcarsBaseY + 10 + 15,   5,  6);
+					ctx.fillStyle   = 'rgba(176, 196, 222, 1)'; ctx.fillRect( lcarsBaseX + 6 + 7 + 64, lcarsBaseY + 10 + 15,  34,  6);
+
+					ctx.fillStyle   = 'rgba(255,   0,   0, 1)'; ctx.fillRect( lcarsBaseX + 6 + 7 +      ( 52 * nStars['rumpf']  * 0.01 ), lcarsBaseY + 10 + 7,   3,  6);
+					ctx.fillStyle   = 'rgba(255,   0,   0, 1)'; ctx.fillRect( lcarsBaseX + 6 + 7 + 64 + ( 31 * nStars['schild'] * 0.01 ), lcarsBaseY + 10 + 7,   3,  6);
+					ctx.font        = '11px Verdana';
+					if( nStars['schild'] > 0 )
+					{
+						ctx.fillStyle = 'rgba(176, 196, 222, 1)';
+						zustandText   = 'Schild: '+nStars['schild']+'%';
+						ctx.fillText('Schild:',             lcarsBaseX + 15, lcarsBaseY + 10);
+						ctx.fillText( nStars['schild']+'%', lcarsBaseX + 77, lcarsBaseY + 10);
+					} else
+					  {
+						ctx.fillStyle = 'rgba(200, 200,   0, 1)';
+						zustandText   = 'Rumpf: '+nStars['rumpf']+'%';
+						ctx.fillText('Rumpf:',              lcarsBaseX + 15, lcarsBaseY + 10);
+						ctx.fillText( nStars['rumpf']+'%',  lcarsBaseX + 77, lcarsBaseY + 10);
+					  }
+
+					ctx.fillStyle   = 'rgba(  0, 255, 255, 1)';
+					ctx.font        = '10px Verdana';
+					ctx.fillText('Warpkern', lcarsBaseX + 15, lcarsBaseY + 69);
+					ctx.lineWidth   = 1; 
+					ctx.strokeStyle = 'rgba(200, 200, 200, 1)'; ctx.strokeRect( lcarsBaseX + 84, lcarsBaseY + 38, 20, 32);
+					    // Frequenz abhängig vom Warpfaktor
+					    coreSpeed   = 12 - nStars['warp'];
+					    coreSpeed   = ( coreSpeed < 2 ) ? 2 : coreSpeed;
+					    nStars['coreLoop']++;
+					if( nStars['coreLoop'] >= coreSpeed )
+					{
+						// Warpkern-Spule ändern
+						nStars['coreLoop'] = 0;
+						nStars['coreOn']   = ( nStars['coreOn'] < 4 ) ? nStars['coreOn'] + 1 : 0;
+
+						// Warpkern-Bits ändern
+						nStars['coreBits'] = [];
+						for( b = 0; b < 4; b++ )
+						{
+							bitNum = Math.round( Math.random() * 15 );
+							nStars['coreBits'][b] = bitNum.toString(2)
+							bitLen = 4 - nStars['coreBits'][b].length;
+							for( p = 0; p < bitLen; p++ )
+							{
+								nStars['coreBits'][b] = '0' + nStars['coreBits'][b];
+							}
+						}
+					}
+
+					for( wc = 0; wc < 5; wc++ )
+					{
+						yPos = 40 + ( wc * 6 );
+						ctx.fillStyle = ( wc == nStars['coreOn'] ) ? 'rgba(0, 255, 255, 1)' : 'rgba( 70, 130, 180, 1)';
+						ctx.fillRect(lcarsBaseX + 86, lcarsBaseY + yPos, 16, 4);
+					}
+
+					ctx.fillStyle = 'rgba(  0, 255,  0, 1)';
+					ctx.font      = '8px Verdana';
+					ctx.fillText(nStars['coreBits'][0]+' '+nStars['coreBits'][1], lcarsBaseX + 17, lcarsBaseY + 45);
+					ctx.fillText(nStars['coreBits'][2]+' '+nStars['coreBits'][3], lcarsBaseX + 17, lcarsBaseY + 56);
+
+					// Rechte Seite
+					// ============
+					ctx.fillStyle   = 'rgba(0, 0, 0, 1)';
+					ctx.fillRect(  nStars['width']-165, nStars['height']-62, 70, 18);
+					ctx.lineWidth   = 1;
+					ctx.strokeStyle = 'rgba(0, 255, 255, 1)';
+					ctx.strokeRect(nStars['width']-165, nStars['height']-62, 70, 18);
+					ctx.fillStyle   = 'rgba(0, 255, 255, 1)';
+					ctx.font        = '12px Verdana';
+					ctx.fillText(nStars['shot']['weapon'], nStars['width']-160, nStars['height']-48);
+
+					ctx.fillStyle   = 'rgba(255, 0, 0, 0.3)';
+					ctx.fillRect(nStars['width']-165, nStars['height']-35, 135, 15);
+					ctx.strokeStyle = ( nStars['shot']['heat'] >= 1 ) ? 'rgba(255, 255, 255, 1)' : 'rgba(255, 0, 0, 1)';
+					ctx.fillStyle   = ( nStars['shot']['heat'] >= 1 ) ? 'rgba(255, 255, 255, 1)' : 'rgba(255, 0, 0, 0.6)';
+					ctx.strokeRect(nStars['width']-165, nStars['height']-35, 135,                        15);
+					ctx.fillRect(  nStars['width']-165, nStars['height']-35, nStars['shot']['heat']*135, 15);
+
+					// Hitze abbauen
+					nStars['shot']['heat'] = ( nStars['shot']['heat'] > 0 ) ? nStars['shot']['heat'] - 0.015 : 0;
+				}
+
+				// Geschwindigkeit falls vorhanden einblenden
+				// ==========================================
+				if( nStars['textMemo'] != '' )
+					{
+					ctx.font      = '12px Verdana';
+					ctx.fillStyle = '#00FFFF';
+					ctx.fillText(nStars['textMemo'], 197, nStars['height']-38);
+
+					// Text-Einblendung nach Ablauf der Zeit wieder zurücksetzen
+					// =========================================================
+					nStars['textCount']--;
+					if( nStars['textCount'] == 0 )
+					{
+						nStars['textMemo'] = '';
+					}
+				}
+			}
+
+			// Fadenkreuz anzeigen
+			// ===================
+			if( nStars['display'] == 1 )
+			{
+				if( Math.max.apply(null, nStars['dir']) > 0 || nStars['flight']['mpOffsetX'] < -5 || nStars['flight']['mpOffsetX'] > 5 || nStars['flight']['mpOffsetY'] < -5 || nStars['flight']['mpOffsetY'] > 5 )
+				{
+					ctx.font      = '24px Verdana';
+					ctx.fillStyle = 'rgb(0, 155, 155)';
+					ctx.beginPath();
+					ctx.fillText('+', nStars['mpX']-10, nStars['mpY']+8);
+					ctx.fill();
+					ctx.closePath();
+				}
+			}
+
+			// Waffen abfeuern
+			// ===============
+			if( nStars['shot']['active'] > 0 )
+			{
+				if( nStars['shot']['weapon'] == 'Phaser' )
+				{
+					// Auslöser Maustaste gedrückt?
+					if( nStars['shot']['trigger'] == 1 )
+					{
+						for( st = 0; st < 6; st++ )
+						{
+							// Den Strahl 6-fach überlappend zeichnen, innen heller
+							// ====================================================
+							ctx.beginPath();
+							ctx.moveTo(nStars['shot']['baseMx'], nStars['shot']['baseMy']);
+							ctx.lineWidth   = 6 - st;
+							ctx.strokeStyle = 'rgba(255, '+st*35+', '+st*35+', 1)';
+							ctx.lineTo(nStars['shot']['x'], nStars['shot']['y']);
+							ctx.stroke(); ctx.closePath();
+						}
+
+						getHit = nWarpShipHit(nStars['shot']['x'], nStars['shot']['y']);
+						if( getHit == 1 )
+						{
+							// Treffer animieren
+							// =================
+							sInner             = 5;
+							sOuter             = 15;
+							sPeaks             = 8;
+							sXpoint            = nStars['shot']['x'];
+							sYpoint            = nStars['shot']['y'];
+							nStars['starRot'] += 0.2;
+							nStars['starRot']  = ( nStars['starRot'] >= ( 2 * Math.PI ) ) ? 0 : nStars['starRot'];
+							starX              = sXpoint + Math.cos( nStars['starRot'] ) * sOuter;
+							starY              = sYpoint + Math.sin( nStars['starRot'] ) * sOuter;
+							grd                = ctx.createRadialGradient(sXpoint, sYpoint, 2, sXpoint, sYpoint, 15);
+							grd.addColorStop(0 ,  'rgba(255, 255, 255, 1)');
+							grd.addColorStop(0.7, 'rgba(255,   0,   0, 1)');
+							grd.addColorStop(1,   'rgba(  0,   0,   0, 1)');
+							ctx.fillStyle      =   grd;
+							ctx.strokeStyle    =  'rgb(255, 0, 0)';
+							ctx.beginPath(); ctx.moveTo(starX, starY);
+							for( sp = 1; sp <= sPeaks; sp++ )
+							{
+								schrittWinkel = ( 2 * Math.PI ) / ( sPeaks * 2 );
+								winkel2       =  ( schrittWinkel * sp * 2 )  + nStars['starRot'];
+								winkel1       =  ( winkel2 - schrittWinkel );
+								starX         = sXpoint + Math.cos( winkel1 ) * sInner;
+								starY         = sYpoint + Math.sin( winkel1 ) * sInner;
+								ctx.lineTo(starX, starY);
+								starX         = sXpoint + Math.cos( winkel2 ) * sOuter;
+								starY         = sYpoint + Math.sin( winkel2 ) * sOuter;
+								ctx.lineTo(starX, starY);
+							}
+							ctx.stroke(); ctx.fill(); ctx.closePath();
+						}
+
+						// Temperatur erhöhen
+						nStars['shot']['heat'] = ( nStars['shot']['heat'] < 1 ) ? nStars['shot']['heat'] + 0.022 : 1;
+						nStars['shot']['heat'] = ( nStars['shot']['heat'] > 1 ) ? 1 : nStars['shot']['heat'];
+						nStars['shot']['loops']++;
+
+						// Bei Überhitzung deaktivieren
+						if( nStars['shot']['heat'] >= 1 )
+						{
+							nStars['shot']['active'] = 0;
+						}
+					}
+				}
+
+				if( nStars['shot']['weapon'] == 'Torpedo' )
+				{
+					// Koordinaten berechnen
+					MyStart = nStars['shot']['baseMy'] - (   nStars['shot']['loops']       * einBetragMy );
+					MyEnde  = nStars['shot']['baseMy'] - ( ( nStars['shot']['loops'] + 1 ) * einBetragMy );
+					if( nStars['shot']['x'] >= nStars['shot']['baseMx'] )
+					{
+						MxStart = nStars['shot']['baseMx'] + (   nStars['shot']['loops']       * einBetragMx );
+						MxEnde  = nStars['shot']['baseMx'] + ( ( nStars['shot']['loops'] + 1 ) * einBetragMx );
+					} else
+					  {
+						MxStart = nStars['shot']['baseMx'] - (   nStars['shot']['loops']       * einBetragMx );
+						MxEnde  = nStars['shot']['baseMx'] - ( ( nStars['shot']['loops'] + 1 ) * einBetragMx );
+					  }
+
+					// Leuchtkraft nimmt mit der Entfernung ab
+					// =======================================
+					torpedoTrans    = 1 - ( nStars['shot']['loops'] / nStars['shot']['steps_t'] );
+					torpedoTrans    = ( torpedoTrans < 0.5 ) ? 0.5 : torpedoTrans;
+					grd             = ctx.createRadialGradient(MxEnde, MyEnde, 3, MxEnde, MyEnde, 10);p
+					grd.addColorStop(0 ,   'rgba(255, 255, 255, '+torpedoTrans+')');
+					grd.addColorStop(0.75, 'rgba(  0, 125, 255, '+torpedoTrans+')');
+					grd.addColorStop(1,    'rgba(  0,   0,   0, '+torpedoTrans+')');
+					ctx.fillStyle   = grd; ctx.beginPath(); ctx.arc(MxEnde, MyEnde, 10, 0, 2*Math.PI, false); ctx.fill(); ctx.closePath();
+
+					    nStars['shot']['loops']++;
+					if( nStars['shot']['loops'] >= nStars['shot']['steps_t'] )
+					{
+						nStars['shot']['active'] = 0;
+						nWarpShipHit(MxEnde, MyEnde);
+					}
+				}
+
+				if( nStars['shot']['weapon'] == 'Laser' )
+				{
+					// Koordinaten des linken Strahls berechnen
+					LyStart = nStars['shot']['baseLy'] - (   nStars['shot']['loops']       * einBetragLy );
+					LyEnde  = nStars['shot']['baseLy'] - ( ( nStars['shot']['loops'] + 1 ) * einBetragLy );
+					if( nStars['shot']['x'] >= nStars['shot']['baseLx'] )
+					{
+						LxStart = nStars['shot']['baseLx'] + (   nStars['shot']['loops']       * einBetragLx );
+						LxEnde  = nStars['shot']['baseLx'] + ( ( nStars['shot']['loops'] + 1 ) * einBetragLx );
+					} else
+					  {
+						LxStart = nStars['shot']['baseLx'] - (   nStars['shot']['loops']       * einBetragLx );
+						LxEnde  = nStars['shot']['baseLx'] - ( ( nStars['shot']['loops'] + 1 ) * einBetragLx );
+					  }
+
+					// Koordinaten des rechten Strahls berechnen
+					RyStart = nStars['shot']['baseRy'] - (   nStars['shot']['loops']       * einBetragRy );
+					RyEnde  = nStars['shot']['baseRy'] - ( ( nStars['shot']['loops'] + 1 ) * einBetragRy );
+					if( nStars['shot']['x'] >= nStars['shot']['baseRx'] )
+					{
+						RxStart = nStars['shot']['baseRx'] + (   nStars['shot']['loops']       * einBetragRx );
+						RxEnde  = nStars['shot']['baseRx'] + ( ( nStars['shot']['loops'] + 1 ) * einBetragRx );
+					} else
+					  {
+						RxStart = nStars['shot']['baseRx'] - (   nStars['shot']['loops']       * einBetragRx );
+						RxEnde  = nStars['shot']['baseRx'] - ( ( nStars['shot']['loops'] + 1 ) * einBetragRx );
+					  }
+
+					for( st = 0; st < 6; st++ )
+					{
+						// Leuchtkraft nimmt mit der Entfernung ab
+						// =======================================
+						stTrans = ( nStars['shot']['steps_l'] - nStars['shot']['loops'] ) / 10;
+
+						ctx.beginPath();
+						ctx.moveTo(LxStart, LyStart);
+						ctx.lineWidth   = 6 - st;
+						ctx.strokeStyle = 'rgba('+st*35+', 255, '+st*35+', '+stTrans+')';
+						ctx.lineTo(LxEnde, LyEnde);
+						ctx.stroke(); ctx.closePath();
+
+						ctx.beginPath();
+						ctx.moveTo(RxStart, RyStart);
+						ctx.lineWidth   = 6 - st;
+						ctx.strokeStyle = 'rgba('+st*35+', 255, '+st*35+', '+stTrans+')';
+						ctx.lineTo(RxEnde, RyEnde);
+						ctx.stroke(); ctx.closePath();
+					}
+
+					    nStars['shot']['loops']++;
+					if( nStars['shot']['loops'] >= nStars['shot']['steps_l'] )
+					{
+						nStars['shot']['active'] = 0;
+						nWarpShipHit(RxEnde, RyEnde);
+					}
+				}
+			}
+
+			// Gegnerischer Schuss
+			// ===================
+			for( sNr = 0; sNr < nStars['ships']['count']; sNr++ )
+			{
+				if( nStars['attack'][sNr]['active'] != 0 )
+				{
+					ctx.fillStyle = 'rgba(255, 0, 0, 0.6)';
+
+					// Nichtlineare Beschleunigung
+					// ===========================
+					nStars['attack'][sNr]['strecke'] += ( nStars['attack'][sNr]['strecke'] * 0.15 );
+					nStars['attack'][sNr]['radius']  += ( nStars['attack'][sNr]['treffer'] == 1 ) ? 15 : 0.5;
+
+					nStars['attack'][sNr]['x']        = nStars['attack'][sNr]['startX'] + Math.cos( nStars['attack'][sNr]['winkel'] ) * nStars['attack'][sNr]['strecke'];
+					nStars['attack'][sNr]['y']        = nStars['attack'][sNr]['startY'] + Math.sin( nStars['attack'][sNr]['winkel'] ) * nStars['attack'][sNr]['strecke'];
+
+					// Prüfung auf Treffer und zeichnen
+					// ================================
+					drawTorpedo = 0;
+					if( nStars['attack'][sNr]['treffer'] == 1 )
+					{
+						// Treffer - im Bereich des Mittelpunktes
+						// ======================================
+						if( nStars['attack'][sNr]['x'] >= ( nStars['mpX'] - 150 ) && nStars['attack'][sNr]['x'] < ( nStars['mpX'] + 150 ) && nStars['attack'][sNr]['y'] >= ( nStars['mpY'] - 150 ) && nStars['attack'][sNr]['y'] < ( nStars['mpY'] + 150 ) )
+						{
+							// Treffer rot aufblitzen lassen und Schaden berechnen
+							// ===================================================
+							ctx.fillRect(0, 0, nStars['width'], nStars['height']-100);
+
+							if( nStars['schild'] > 0 )
+							{
+								nStars['schild'] -= nStars['attack']['damage'];
+								nStars['schild']  = ( nStars['schild'] < 0 ) ? 0 : nStars['schild'];
+							} else
+							  {
+								nStars['rumpf']  -= nStars['attack']['damage'];
+								nStars['rumpf']   = ( nStars['rumpf']  < 0 ) ? 0 : nStars['rumpf'];
+
+								if( nStars['rumpf'] <= 25 ) { nWarpCrack(3); } else
+								if( nStars['rumpf'] <= 50 ) { nWarpCrack(2); } else
+								if( nStars['rumpf'] <= 75 ) { nWarpCrack(1); }
+
+								if( nStars['rumpf'] <= 0 )
+								{
+									// Schiff zerstört -> Explosion einleiten
+									// ======================================
+									nStars['display']  =  0;
+									nStars['gameOver'] = -1;
+								}
+							  }
+
+							nStars['attack'][sNr]['active'] = 0;
+							window.setTimeout("nWarpShipShot("+sNr+")", ( ( nStars['attack']['fire'] * 0.6 ) + ( Math.random() * ( nStars['attack']['fire'] * 0.4 ) ) ) );
+						} else
+						  {
+							drawTorpedo = 1;
+						  }
+					} else
+					  {
+						// Schuss geht daneben
+						// ===================
+						if( nStars['attack'][sNr]['x'] <= 0 || nStars['attack'][sNr]['x'] >= nStars['width'] || nStars['attack'][sNr]['y'] <= 0 || nStars['attack'][sNr]['y'] >= ( nStars['height'] - 100 - ( 0.5 * nStars['attack'][sNr]['radius'] ) ) )
+						{
+							nStars['attack'][sNr]['active'] = 0;
+							window.setTimeout("nWarpShipShot("+sNr+")", ( ( nStars['attack']['fire'] * 0.25 ) + ( Math.random() * ( nStars['attack']['fire'] * 0.75 ) ) ) );
+						} else
+						  {
+							drawTorpedo = 1;
+						  }
+					  }
+					if( drawTorpedo == 1 )
+					{
+						grd           = ctx.createRadialGradient(nStars['attack'][sNr]['x'], nStars['attack'][sNr]['y'], 3, nStars['attack'][sNr]['x'], nStars['attack'][sNr]['y'], nStars['attack'][sNr]['radius']);
+						grd.addColorStop(0 ,   'rgba(255, 255, 255, 1)');
+						grd.addColorStop(0.75, 'rgba(255,   0,   0, 1)');
+						grd.addColorStop(1,    'rgba(  0,   0,   0, 1)');
+						ctx.fillStyle = grd; ctx.beginPath(); ctx.arc(nStars['attack'][sNr]['x'], nStars['attack'][sNr]['y'], nStars['attack'][sNr]['radius'], 0, 2*Math.PI, false); ctx.fill(); ctx.closePath();
+					}
+				}
+			}
+
+			// Explosion zeichnen
+			// ==================
+			if( nStars['gameOver'] == -1 )
+			{
+				if( nStars['explosion'] == 0 )
+				{
+					// Bruchstücke als Polygone erzeugen
+					// =================================
+					nStars['exCoords']            = [];
+					nStars['exCoords']['counter'] = 0;
+
+					for( br = 0; br < 200; br++ )
+					{
+						// Startposition und Richtungswinkel zufällig
+						// ==========================================
+						coordStartX =                                Math.random() * nStars['width'];
+						coordStartY = ( nStars['height'] - 150 ) + ( Math.random() * 150 );
+
+						nStars['exCoords'][br]           = [];
+						nStars['exCoords'][br]['alpha']  =  Math.random() * Math.PI * 2;
+						nStars['exCoords'][br]['startX'] =  coordStartX;
+						nStars['exCoords'][br]['startY'] =  coordStartY;
+						nStars['exCoords'][br]['x']      = [];
+						nStars['exCoords'][br]['y']      = [];
+
+						// Anzahl der Ecken und Kantenlängen zufällig
+						// ==========================================
+						brNum = Math.round( 2 + ( Math.random() * 2 ) );
+						for( brc = 0; brc < brNum; brc++ )
+						{
+							coordNextX = -50 + ( Math.random() * 100 );
+							coordNextY = -50 + ( Math.random() * 100 );
+
+							nStars['exCoords'][br]['x'].push(coordNextX);
+							nStars['exCoords'][br]['y'].push(coordNextY);
+						}
+					}
+
+					nStars['explosion'] = -1;
+				} else
+				  {
+					// Bruchstücke bewegen & zeichnen ( nach 150 Durchgängen sind alle Teile aus dem Bild geflogen)
+					// ============================================================================================
+					if( nStars['exCoords']['counter'] < 150 )
+					{
+						ctx.strokeStyle = '#505050';
+						ctx.fillStyle   = '#505050';
+
+						for( br = 0; br < nStars['exCoords'].length; br++ )
+						{
+							// Flug jedes Teils weiterführen
+							// =============================
+							goRange = 15 * ( nStars['exCoords']['counter'] + 1 );
+							goPosX  = nStars['exCoords'][br]['startX'] + goRange * Math.cos( nStars['exCoords'][br]['alpha'] );
+							goPosY  = nStars['exCoords'][br]['startY'] + goRange * Math.sin( nStars['exCoords'][br]['alpha'] );
+
+							// Polygon an aktueller Position zeichnen
+							// ======================================
+							ctx.beginPath();
+							for( brc = 0; brc < nStars['exCoords'][br]['x'].length; brc++ )
+							{
+								if( brc == 0 )
+								{
+									ctx.moveTo( goPosX + nStars['exCoords'][br]['x'][brc], goPosY + nStars['exCoords'][br]['y'][brc]);
+								} else
+								  {
+									ctx.lineTo( goPosX + nStars['exCoords'][br]['x'][brc], goPosY + nStars['exCoords'][br]['y'][brc]);
+								  }
+							}
+							ctx.lineTo( goPosX + nStars['exCoords'][br]['x'][0], goPosY + nStars['exCoords'][br]['y'][0]);
+							ctx.stroke(); ctx.fill(); ctx.closePath();
+						}
+
+						nStars['exCoords']['counter']++;
+					} else
+					  {
+						// Game Over Meldung nach der Explosion
+						// ====================================
+						nStars['gameOver'] = 1;
+						nStars['run']      = 0;
+						nWarpGameOver();
+						return;
+					  }
+				  }
+			}
+
+			// Ziellinien zeichnen
+			// ===================
+			if( nStars['enemies'] == 1 && nStars['gameOver'] == 0 && nStars['mouseOver'] == 1 )
+			{
+				if( nStars['mousePosY'] < nStars['height'] - 100 )
+				{
+					// Ziel erfasst
+					// ============
+					targetHit = 0;
+					for( sNr  = 0; sNr < nStars['ships']['count']; sNr++ )
+					{
+						sdX = nStars['ships'][sNr]['x'] - ( nStars['ships'][sNr]['w'] / 2 );
+						sdY = nStars['ships'][sNr]['y'] - ( nStars['ships'][sNr]['h'] / 2 );
+						if( nStars['mousePosX'] >= sdX && nStars['mousePosX'] < ( sdX + nStars['ships'][sNr]['w'] ) && nStars['mousePosY'] >= sdY && nStars['mousePosY'] < ( sdY + nStars['ships'][sNr]['h'] ) )
+						{
+							targetHit = 1;
+						}
+					}
+
+					ctx.lineWidth   = 1;
+					ctx.strokeStyle = ( targetHit == 1 ) ? 'rgba(255, 0, 0, 0.6)' : 'rgba(0, 255, 255, 0.6)';
+					ctx.strokeRect(nStars['mousePosX']-10, nStars['mousePosY']-10, 20, 20);
+
+					ctx.beginPath(); ctx.moveTo(0,                      nStars['mousePosY']);    ctx.lineTo(nStars['mousePosX']-10, nStars['mousePosY']);    ctx.stroke(); ctx.closePath();
+					ctx.beginPath(); ctx.moveTo(nStars['mousePosX']+10, nStars['mousePosY']);    ctx.lineTo(nStars['width'],        nStars['mousePosY']);    ctx.stroke(); ctx.closePath();
+					ctx.beginPath(); ctx.moveTo(nStars['mousePosX'],    0);                      ctx.lineTo(nStars['mousePosX'],    nStars['mousePosY']-10); ctx.stroke(); ctx.closePath();
+					ctx.beginPath(); ctx.moveTo(nStars['mousePosX'],    nStars['mousePosY']+10); ctx.lineTo(nStars['mousePosX'],    nStars['height']-100);   ctx.stroke(); ctx.closePath();
+				}
+			}
+		}
+
+		// Im ersten Programmdurchlauf das Canvas berechnen, Sterne initialisieren und zeichnen
+		// ====================================================================================
+		if( nStars['init'] == 0 )
+		{
+			// Maus im Canvas -> Position für Ziellinien speichern
+			// ===================================================
+			nStars['canvas'].addEventListener("mouseover",   nWarpMouseOver,   true);
+			nStars['canvas'].addEventListener("mouseout",    nWarpMouseOut,   true);
+
+			function nWarpMouseOver(event)
+			{
+				nStars['mouseOver'] = 1;
+			}
+
+			function nWarpMouseOut(event)
+			{
+				nStars['mouseOver'] = 0;
+			}
+
+			nStars['width']               = nStars['canvas'].width;
+			nStars['height']              = nStars['canvas'].height;
+			nStars['mpX']                 = Math.round( nStars['width']  / 2 );
+			nStars['mpY']                 = Math.round( nStars['height'] / 2 );
+			nStars['flight']['mpOffsetX'] = 0;
+			nStars['flight']['mpOffsetY'] = 0;
+			nStars['maxRange']            = ( nStars['height'] >= nStars['width'] ) ? ( 0.9 * ( nStars['width'] / 2 ) ) : ( 0.9 * ( nStars['height'] / 2 ) );
+
+			// HEX-Farben in RGB für schnelleren Zugriff umrechnen
+			// ===================================================
+			nStars['rgb'] = [];
+			for( c = 0; c < nStars['colors'].length; c++ )
+			{
+				nStars['rgb'][c]    = [];
+				nStars['rgb'][c][0] = parseInt( nStars['colors'][c].substring(1, 3), 16);
+				nStars['rgb'][c][1] = parseInt( nStars['colors'][c].substring(3, 5), 16);
+				nStars['rgb'][c][2] = parseInt( nStars['colors'][c].substring(5, 7), 16);
+			}
+
+			for( s = 0; s < nStars['stars']; s++ )
+			{
+				nStars['pos'][s] = [];
+				nWarpStarInit(s);
+				nWarpStarDraw(s);
+			}
+
+			// Alle Schiffe vorbereiten
+			// ========================
+			for( g = 0; g < nStars['ships']['count']; g++ )
+			{
+				nStars['ships'][g]            = [];
+				nStars['ships'][g]['img']     = new Image();
+				nStars['ships'][g]['img'].src = nStars['ships']['image_url'];
+				nStars['ships'][g]['width']   = nStars['ships']['image_width'];
+				nStars['ships'][g]['height']  = nStars['ships']['image_height'];
+
+				nStars['attack'][g]           = [];
+				nStars['attack'][g]['active'] = 0;
+
+				nWarpShipInit(g);
+			}
+
+			nStars['coreBits'] = ['0000', '0000', '0000', '0000'];
+
+			nStars['init']     = 1;
+		}
+
+		if( nStars['run'] == 1 )
+		{
+			nStars['timer'] = window.setTimeout("nWarp()", nStars['delay']);
+		} else
+		  {
+			window.clearTimeout(nStars['timer']);
+		  }
+	}
+
+
+	// Stern initialisieren
+	// ********************
+	function nWarpStarInit(s)
+	{
+		// Stern zufällig positionieren mit einem Winkel zwischen 0 und 360 Grad, sowie einem gewissen Abstand vom Mittelpunkt
+		// ===================================================================================================================
+		nStars['pos'][s]['entfernung'] = Math.random();
+
+		// Flugsteuerung - Sternentstehungsgebiet eingrenzen und der Richtung anpassen
+		// ===========================================================================
+		if( nStars['dir'][0] != nStars['dir'][1] && nStars['dir'][2] != nStars['dir'][3] )
+		{
+			if( nStars['dir'][0] == 1 && nStars['dir'][2] == 1 ) { nStars['flight']['neuerWinkel'] = ( 0.5 * Math.PI ) + ( Math.random() * 0.5 * Math.PI ); } else		// nach links  oben
+			if( nStars['dir'][0] == 1 && nStars['dir'][3] == 1 ) { nStars['flight']['neuerWinkel'] = ( 1.0 * Math.PI ) + ( Math.random() * 0.5 * Math.PI ); } else		// nach links  unten
+			if( nStars['dir'][1] == 1 && nStars['dir'][2] == 1 ) { nStars['flight']['neuerWinkel'] = ( 0.0 * Math.PI ) + ( Math.random() * 0.5 * Math.PI ); } else		// nach rechts oben
+			if( nStars['dir'][1] == 1 && nStars['dir'][3] == 1 ) { nStars['flight']['neuerWinkel'] = ( 1.5 * Math.PI ) + ( Math.random() * 0.5 * Math.PI ); } else		// nach rechts unten
+			if( nStars['dir'][0] == 1                          ) { nStars['flight']['neuerWinkel'] = ( 0.5 * Math.PI ) + ( Math.random() *       Math.PI ); } else		// nach links
+			if( nStars['dir'][1] == 1                          ) { nStars['flight']['neuerWinkel'] = ( 1.5 * Math.PI ) + ( Math.random() *       Math.PI ); } else		// nach rechts
+			if( nStars['dir'][2] == 1                          ) { nStars['flight']['neuerWinkel'] = ( 0.0 * Math.PI ) + ( Math.random() *       Math.PI ); } else		// nach oben
+			if( nStars['dir'][3] == 1                          ) { nStars['flight']['neuerWinkel'] = ( 1.0 * Math.PI ) + ( Math.random() *       Math.PI ); } else		// nach unten
+			{
+				// Entstehung im ganzen Kreis
+				nStars['flight']['neuerWinkel'] = Math.random() * ( 2 * Math.PI );
+			}
+		} else
+		  {
+				// Entstehung im ganzen Kreis
+				nStars['flight']['neuerWinkel'] = Math.random() * ( 2 * Math.PI );
+		  }
+		nStars['pos'][s]['winkel'] = nStars['flight']['neuerWinkel'];
+
+		// Je größer die Entfernung, desto weiter weg vom Mittelpunkt erscheint er
+		// =======================================================================
+					 range = ( 0.8 * nStars['maxRange'] ) + ( 0.2 * nStars['maxRange'] * nStars['pos'][s]['entfernung'] );		// Abstand in dem neue Sterne auftauchen
+		nStars['pos'][s]['strecke']    = ( nStars['init'] == 0 ) ? Math.floor( Math.random() * ( ( nStars['maxRange'] / 9 * 10 ) * 1.5 ) ) : Math.floor( Math.random() * range );
+		nStars['pos'][s]['strecke']    = ( nStars['pos'][s]['strecke'] < 35 ) ? ( Math.floor( 25 + ( Math.random() * 20 ) ) ) : nStars['pos'][s]['strecke'];
+
+		nStars['pos'][s]['start']      =   nStars['pos'][s]['strecke'];										// Startwert zur weiteren Berechnung speichern
+
+		nStars['pos'][s]['radius']     = ( 0.4 * nStars['radius'] ) + ( 0.6 * nStars['radius'] * ( 1 - nStars['pos'][s]['entfernung'] ) );	// Mindestens 40% vom maximalen Radius
+		nStars['pos'][s]['tempo']      = nStars['speed'] - ( nStars['pos'][s]['entfernung'] * 0.9 * nStars['speed']  );				// Mindestens 10% der Schrittweite auf Hypotenuse
+		nStars['pos'][s]['helligkeit'] = 255             - ( nStars['pos'][s]['entfernung'] * 200                    );				// Mindestens 55  von 255 (RGB-Wert)
+
+		nStars['pos'][s]['x']          = nStars['mpX'] + Math.cos( nStars['pos'][s]['winkel'] ) * nStars['pos'][s]['strecke'];			// Entfernung X-Achse vom Mittelpunkt
+		nStars['pos'][s]['y']          = nStars['mpY'] + Math.sin( nStars['pos'][s]['winkel'] ) * nStars['pos'][s]['strecke'];			// Entfernung Y-Achse vom Mittelpunkt
+
+		nStars['pos'][s]['x_pre']      = nStars['pos'][s]['x'];
+		nStars['pos'][s]['y_pre']      = nStars['pos'][s]['y'];
+
+		nStars['pos'][s]['count']      = ( nStars['init'] == 0 ) ? 0 : ( nStars['pos'][s]['count'] + 1 );					// Anzahl der Durchflüge
+
+		// Zuweisung der Farbe
+		// ===================
+		if( nStars['coloured'] == 1 )
+		{
+			// 25% bunte Sterne
+			c = ( Math.random() > 0.75 ) ? ( Math.floor( Math.random() * ( nStars['colors'].length - 1 ) ) + 1 ) : 0;
+		} else
+		  {
+			c = 0;
+		  }
+		nStars['pos'][s]['farbe']      = c;
+	}
+
+
+	// Stern bewegen
+	// *************
+	function nWarpStarMove(s)
+	{
+		// Tempo (Schrittweite) nichtlinear erhöhen, mit Mindestbeschleunigung und abhängig von der Entfernung
+		// ===================================================================================================
+		if( nStars['warp'] <= 10 )
+		{
+			warpFactor = nStars['warp'] / 100;
+			steerUse   = ( nStars['warp'] / 10 ) * nStars['steer'];
+			steerUse   = ( steerUse < 1 ) ? 1 : steerUse;
+		} else
+		if( nStars['warp'] == 11 )
+		{
+			warpFactor = 0.5;
+			steerUse   = nStars['steer'] * 3;
+		} else
+		if( nStars['warp'] == 12 )
+		{
+			warpFactor = 3;
+			steerUse   = nStars['steer'] * 9;
+		} else
+		if( nStars['warp'] == 13 )
+		{
+			warpFactor = 0.5;
+			steerUse   = nStars['steer'];
+
+			// Sterne rotieren lassen
+			// ======================
+			nStars['pos'][s]['winkel'] += 0.3;
+			nStars['pos'][s]['winkel'] = ( nStars['pos'][s]['winkel'] > ( 2 * Math.PI ) ) ? ( nStars['pos'][s]['winkel'] - ( 2 * Math.PI ) ) : nStars['pos'][s]['winkel'];
+		} else
+		  {
+			warpFactor = 3;
+			steerUse   = nStars['steer'];
+		  }
+
+				   accFactor = ( nStars['start'] == 1 && nStars['firstLoop'] == 1 ) ? 0.13 : warpFactor;
+		                      accMin = ( nStars['pos'][s]['entfernung'] > 0.4 ) ? 0.4 : nStars['pos'][s]['entfernung'];
+
+			       nStars['mpX'] = Math.round( nStars['width']  / 2 ) + nStars['flight']['mpOffsetX'];
+			       nStars['mpY'] = Math.round( nStars['height'] / 2 ) + nStars['flight']['mpOffsetY'];
+
+		nStars['pos'][s]['tempo']   += ( nStars['pos'][s]['tempo'] * ( 1 - accMin ) * accFactor );
+		nStars['pos'][s]['strecke'] +=   nStars['pos'][s]['tempo'];
+
+		nStars['pos'][s]['x']        = nStars['mpX'] + Math.cos( nStars['pos'][s]['winkel'] ) * nStars['pos'][s]['strecke'];
+		nStars['pos'][s]['y']        = nStars['mpY'] + Math.sin( nStars['pos'][s]['winkel'] ) * nStars['pos'][s]['strecke'];
+
+		// Flugsteuerung - Sterne versetzen, je näher desto weniger
+		// ========================================================
+		    nStars['flight']['changeDir'] =  0;
+
+		if( nStars['dir'][0] == 1 ) { nStars['pos'][s]['x'] += steerUse; nStars['flight']['changeDir'] = 1; }
+		if( nStars['dir'][1] == 1 ) { nStars['pos'][s]['x'] -= steerUse; nStars['flight']['changeDir'] = 1; }
+		if( nStars['dir'][2] == 1 ) { nStars['pos'][s]['y'] -= steerUse; nStars['flight']['changeDir'] = 1; }
+		if( nStars['dir'][3] == 1 ) { nStars['pos'][s]['y'] += steerUse; nStars['flight']['changeDir'] = 1; }
+
+		if( nStars['flight']['changeDir'] == 1 )
+		{
+			// Neuen Winkel und Abstand berechnen
+			nStars['flight']['betragX_an'] = ( nStars['pos'][s]['x'] >= nStars['mpX'] ) ? ( nStars['pos'][s]['x'] - nStars['mpX'] ) : ( nStars['mpX'] - nStars['pos'][s]['x'] );
+			nStars['flight']['betragY_ge'] = ( nStars['pos'][s]['y'] >= nStars['mpY'] ) ? ( nStars['pos'][s]['y'] - nStars['mpY'] ) : ( nStars['mpY'] - nStars['pos'][s]['y'] );
+
+			if( nStars['pos'][s]['x'] >= nStars['mpX'] && nStars['pos'][s]['y'] < nStars['mpY'] )
+			{
+				// Quadrant 4
+				nStars['flight']['winkelNeu'] = Math.atan( nStars['flight']['betragX_an'] / nStars['flight']['betragY_ge'] ) + ( Math.PI * 1.5 );
+				nStars['flight']['hypoNeu']   = nStars['flight']['betragY_ge'] / Math.sin( nStars['flight']['winkelNeu'] ) * -1;
+			} else
+			if( nStars['pos'][s]['x'] < nStars['mpX'] && nStars['pos'][s]['y'] < nStars['mpY'] )
+			{
+				// Quadrant 3
+				nStars['flight']['winkelNeu'] = Math.atan( nStars['flight']['betragY_ge'] / nStars['flight']['betragX_an'] ) + ( Math.PI  );
+				nStars['flight']['hypoNeu']   = nStars['flight']['betragY_ge'] / Math.sin( nStars['flight']['winkelNeu'] ) * -1;
+			} else
+			if( nStars['pos'][s]['x'] < nStars['mpX'] && nStars['pos'][s]['y'] >= nStars['mpY'] )
+			{
+				// Quadrant 2
+				nStars['flight']['winkelNeu'] = Math.atan( nStars['flight']['betragX_an'] / nStars['flight']['betragY_ge'] ) + ( Math.PI / 2 );
+				nStars['flight']['hypoNeu']   = nStars['flight']['betragY_ge'] / Math.sin( nStars['flight']['winkelNeu'] );
+			} else
+			  {
+				// Quadrant 1
+				nStars['flight']['winkelNeu'] = Math.atan( nStars['flight']['betragY_ge'] / nStars['flight']['betragX_an'] );
+				nStars['flight']['hypoNeu']   = nStars['flight']['betragY_ge'] / Math.sin( nStars['flight']['winkelNeu'] );
+			  }
+
+			nStars['pos'][s]['winkel']  = nStars['flight']['winkelNeu'];
+			nStars['pos'][s]['strecke'] = nStars['flight']['hypoNeu'];
+		}
+
+		// Prüfung ob ein Stern aus dem Bild geflogen ist
+		// ==============================================
+		if( nStars['pos'][s]['x'] <= 0 || nStars['pos'][s]['x'] >= nStars['width'] || nStars['pos'][s]['y'] <= 0 || nStars['pos'][s]['y'] >= nStars['height'] )
+		{
+			nStars['countLoop']++;
+			nStars['firstLoop'] = ( nStars['countLoop'] < nStars['stars'] ) ? 1 : 0;
+
+			nWarpStarInit(s);
+		}
+	}
+
+
+	// Stern zeichnen
+	// **************
+	function nWarpStarDraw(s)
+	{
+		// Volle zugewiesene helligkeit erst bei maximaler Nähe zum Betrachter, aber mindestens 10%
+		// ========================================================================================
+
+		// Prozente der zurückgelegten Gesamtstrecke
+		starDistance    =   nStars['maxRange'] - nStars['pos'][s]['start'];				// Ggf. < 0 im ersten Zyklus
+		brightFactor    = ( nStars['pos'][s]['strecke'] - nStars['pos'][s]['start'] ) / starDistance;
+		brightFactor    = ( brightFactor > 1   ) ? 1   : brightFactor;
+		brightFactor    = ( brightFactor < 0.1 ) ? 0.1 : brightFactor;					// Minimum, falls Start > Range im ersten Zyklus
+
+		// Prozente der maximalen Helligkeit
+		brightPerc      = ( nStars['pos'][s]['helligkeit'] / 255 );
+
+		// Einzelne RGB-Werte passend zur Entfernung und Nähe berechnen
+		brightnessR     = Math.round( ( 0.1 * nStars['rgb'][nStars['pos'][s]['farbe']][0] * brightPerc ) + ( 0.9 * nStars['rgb'][nStars['pos'][s]['farbe']][0] * brightPerc * brightFactor ) );
+		brightnessG     = Math.round( ( 0.1 * nStars['rgb'][nStars['pos'][s]['farbe']][1] * brightPerc ) + ( 0.9 * nStars['rgb'][nStars['pos'][s]['farbe']][1] * brightPerc * brightFactor ) );
+		brightnessB     = Math.round( ( 0.1 * nStars['rgb'][nStars['pos'][s]['farbe']][2] * brightPerc ) + ( 0.9 * nStars['rgb'][nStars['pos'][s]['farbe']][2] * brightPerc * brightFactor ) );
+
+		ctx.fillStyle   = 'rgb('+brightnessR+','+brightnessG+','+brightnessB+')';
+		ctx.strokeStyle = 'rgb('+brightnessR+','+brightnessG+','+brightnessB+')';
+
+		// Hyperraum-Tunnel
+		// ================
+		if( nStars['warp'] == 13 )
+		{
+			ctx.lineWidth   = 3;
+			ctx.fillStyle   = 'rgb(0, '+(Math.round(Math.random()*255))+', 255)';
+			ctx.strokeStyle = 'rgb(0, '+(Math.round(Math.random()*255))+', 255)';
+		}
+
+		ctx.beginPath();
+		ctx.arc(nStars['pos'][s]['x'], nStars['pos'][s]['y'], nStars['pos'][s]['radius'], 0, 2*Math.PI, false);
+		ctx.fill();
+		ctx.closePath();
+
+		// Streifen - von aktueller zu letzter Position aus Speicher
+		// =========================================================
+		if( nStars['stripes'] == 1 )
+		{
+			ctx.beginPath();
+			ctx.moveTo(nStars['pos'][s]['x'],     nStars['pos'][s]['y']);
+			ctx.lineTo(nStars['pos'][s]['x_pre'], nStars['pos'][s]['y_pre'])
+			ctx.stroke();
+			ctx.closePath();
+		}
+
+		// Lange Start-Streifen - nur bis zum ersten Flug aus dem Bild
+		// ===========================================================
+		if( nStars['start'] == 1 && nStars['pos'][s]['count'] == 0 )
+		{
+			startX = nStars['mpX'] + Math.cos( nStars['pos'][s]['winkel'] ) * nStars['pos'][s]['start'];
+			startY = nStars['mpY'] + Math.sin( nStars['pos'][s]['winkel'] ) * nStars['pos'][s]['start'];
+
+			ctx.beginPath();
+			ctx.moveTo(nStars['pos'][s]['x'], nStars['pos'][s]['y']);
+			ctx.lineTo(startX, startY)
+			ctx.stroke();
+			ctx.closePath();
+		}
+
+		// Aktuelle Position in den Speicher verschieben
+		// =============================================
+		nStars['pos'][s]['x_pre'] = nStars['pos'][s]['x'];
+		nStars['pos'][s]['y_pre'] = nStars['pos'][s]['y'];
+	}
+
+
+	// Nach Größenänderung des Browserfenster die Canvas-Größe neu initialisieren
+	// **************************************************************************
+	function nWarpResize()
+	{
+		nStars['canvas'] = document.getElementById(nStars['id']);
+
+		if( nStars['resize'] == 1 )
+		{
+			nStars['init']      = 0;
+			nStars['countLoop'] = 0;
+			nStars['firstLoop'] = 1;
+
+			if( nStars['run'] == 0 )
+			{
+				nStars['canvas'].width       = window.innerWidth  - nStars['margin'];
+				nStars['canvas'].height      = window.innerHeight - nStars['margin'];
+				nStars['width']    = nStars['canvas'].width;
+				nStars['height']   = nStars['canvas'].height;
+				nStars['maxRange'] = ( nStars['height'] >= nStars['width'] ) ? ( 0.9 * ( nStars['width'] / 2 ) ) : ( 0.9 * ( nStars['height'] / 2 ) );
+				nWarp();
+			}
+		}
+	}
+
+
+	// Pausieren der Hauptfunktion
+	// ***************************
+	function nWarpRun()
+	{
+		if( nStars['run'] == 1 )
+		{
+			nStars['run']       = 0;
+			nStars['textMemo']  = 'Pause';
+			nStars['textCount'] = 5;
+		} else
+		  {
+			nStars['run']       = 1;
+			nStars['timer']     = window.setTimeout("nWarp()", nStars['delay']);
+		  }
+	}
+
+
+	// Umschaltung Geschwindigkeit
+	// ***************************
+	function nWarpSpeed(dir)
+	{
+		if( dir == '+' )
+		{
+			nStars['warp']++;
+			nStars['warp'] = ( nStars['warp'] > 13 ) ? 13 : nStars['warp'];
+		} else
+		  {
+			nStars['warp']--;
+			nStars['warp'] = ( nStars['warp'] <  1 ) ?  1 : nStars['warp'];
+		  }
+
+		// Text anzeigen
+		// =============
+		if( nStars['warp'] <= 9 )
+		{
+			nStars['textMemo'] = 'Warp '+nStars['warp'];
+		} else
+		if( nStars['warp'] == 10 )
+		{
+			nStars['textMemo'] = 'Warp 9,9';
+		} else
+		if( nStars['warp'] == 11 )
+		{
+			nStars['textMemo'] = 'Trans-Warp';
+		} else
+		if( nStars['warp'] == 12 )
+		{
+			nStars['textMemo'] = 'Slipstream';
+		} else
+		  {
+			nStars['textMemo'] = 'Hyperraum';
+		  }
+
+		nStars['textCount'] = 100;
+
+		// Streifen einblenden
+		// ===================
+		if( nStars['warp'] > 9 )
+		{
+			nStars['stripes'] = 1;
+		}
+	}
+
+
+	// Flug-Steuerbefehle speichern
+	// ****************************
+	function nWarpSteer(mode, keyPressed)
+	{
+		if( mode == 'down' )
+		{
+			nStars['dir'][0] = ( keyPressed == 37 || keyPressed == 65 ) ? 1 : nStars['dir'][0];
+			nStars['dir'][1] = ( keyPressed == 39 || keyPressed == 68 ) ? 1 : nStars['dir'][1];
+			nStars['dir'][2] = ( keyPressed == 38 || keyPressed == 87 ) ? 1 : nStars['dir'][2];
+			nStars['dir'][3] = ( keyPressed == 40 || keyPressed == 83 ) ? 1 : nStars['dir'][3];
+		} else
+		  {
+			nStars['dir'][0] = ( keyPressed == 37 || keyPressed == 65 ) ? 0 : nStars['dir'][0];
+			nStars['dir'][1] = ( keyPressed == 39 || keyPressed == 68 ) ? 0 : nStars['dir'][1];
+			nStars['dir'][2] = ( keyPressed == 38 || keyPressed == 87 ) ? 0 : nStars['dir'][2];
+			nStars['dir'][3] = ( keyPressed == 40 || keyPressed == 83 ) ? 0 : nStars['dir'][3];
+		  }
+	}
+
+
+	// Farben ein- und ausschalten
+	// ***************************
+	function nWarpColors()
+	{
+		if( nStars['coloured'] == 1 )
+		{
+			nStars['coloured'] = 0;
+			nStars['textMemo'] = 'Farben aus';
+		} else
+		  {
+			nStars['coloured'] = 1;
+			nStars['textMemo'] = 'Farben ein';
+		  }
+
+		nStars['textCount'] = 50;
+	}
+
+
+	// Verzögerungs-Streifen ein- und ausschalten
+	// ******************************************
+	function nWarpStripes()
+	{
+		if( nStars['stripes'] == 1 )
+		{
+			nStars['stripes']  = 0;
+			nStars['textMemo'] = 'Streifen aus';
+		} else
+		  {
+			nStars['stripes']  = 1;
+			nStars['textMemo'] = 'Streifen ein';
+		  }
+
+		nStars['textCount'] = 50;
+	}
+
+
+	// Gegner (de)aktivieren
+	// *********************
+	function nWarpShipSwitch()
+	{
+		if( nStars['enemies'] == 1 )
+		{
+			nStars['enemies'] = 0;
+		} else
+		  {
+			nStars['enemies'] = 1;
+			for( sNr = 0; sNr < nStars['ships']['count']; sNr++ )
+			{
+				nWarpShipInit(sNr);
+			}
+		  }
+	}
+
+
+	// Gegner neu erstellen
+	// ********************
+	function nWarpShipInit(id)
+	{
+		if( nStars['enemies'] == 1 )
+		{
+			nStars['ships'][id]['active'] = 1;
+			nStars['ships'][id]['size']   = 0.1;						// Anfangsgröße
+			nStars['ships'][id]['w']      = 0;
+			nStars['ships'][id]['h']      = 0;
+			nStars['ships'][id]['x']      = nStars['mpX'];
+			nStars['ships'][id]['y']      = nStars['mpY'];
+			nStars['ships'][id]['flash']  = 0;
+			nStars['ships'][id]['shield'] = 2;						// Schildstärke
+			nStars['ships'][id]['hull']   = 2;						// Hüllenstärke
+			nStars['ships'][id]['alpha']  = Math.random() * ( 2 * Math.PI );		// Richtungswinkel
+			nStars['ships'][id]['range']  = Math.random() * ( nStars['maxRange'] / 2 );	// Anfangsentfernung vom Mittelpunkt
+			nStars['ships'][id]['speed']  = 0.3 + ( Math.random() * 0.7 );			// Geschwindigkeit
+
+			window.setTimeout("nWarpShipShot("+id+")", ( ( nStars['attack']['fire'] * 0.5 ) + ( Math.random() * ( nStars['attack']['fire'] * 0.5 ) ) ) );
+		}
+	}
+
+
+	// Gegner bewegen
+	// **************
+	function nWarpShipMove(id)
+	{
+		if( nStars['ships'][id]['active'] != 0 )
+		{
+			nStars['ships'][id]['range'] += ( nStars['ships'][id]['speed'] * 3 );
+
+			nStars['ships'][id]['size']  += 0.005;						// Schiff vergrößern, ja näher es kommt
+			nStars['ships'][id]['size']   = ( nStars['ships'][id]['size'] < 0.1 ) ? 0.1 : nStars['ships'][id]['size'];
+			nStars['ships'][id]['size']   = ( nStars['ships'][id]['size'] > 1.0 ) ? 1.0 : nStars['ships'][id]['size'];
+
+			// Schiffe entgegengesetzt dem Mittelpunkt verschieben
+			// ===================================================
+			nStars['ships'][id]['x']      = Math.round( nStars['width']  / 2 ) - nStars['flight']['mpOffsetX'] + Math.cos( nStars['ships'][id]['alpha'] ) * nStars['ships'][id]['range'];
+			nStars['ships'][id]['y']      = Math.round( nStars['height'] / 2 ) - nStars['flight']['mpOffsetY'] + Math.sin( nStars['ships'][id]['alpha'] ) * nStars['ships'][id]['range'];
+
+			nStars['ships'][id]['w']      = nStars['ships'][id]['width']  * nStars['ships'][id]['size'];
+			nStars['ships'][id]['h']      = nStars['ships'][id]['height'] * nStars['ships'][id]['size'];
+
+			// Prüfung ob Schiff aus dem Bild geflogen ist
+			// ===========================================
+			if( nStars['ships'][id]['x'] <= 0 || nStars['ships'][id]['x'] >= nStars['width'] || nStars['ships'][id]['y'] <= 0 || nStars['ships'][id]['y'] >= ( nStars['height'] - 100 ) )
+			{
+				nWarpShipInit(id);
+			} else
+			  {
+				nWarpShipDraw(id);
+			  }
+		}
+	}
+
+
+	// Gegner zeichnen
+	// ***************
+	function nWarpShipDraw(id)
+	{
+		if( nStars['ships'][id]['active'] != 0 )
+		{
+			sdX = nStars['ships'][id]['x'] - ( nStars['ships'][id]['w'] / 2 );
+			sdY = nStars['ships'][id]['y'] - ( nStars['ships'][id]['h'] / 2 );
+
+			ctx.drawImage(nStars['ships'][id]['img'], sdX, sdY, nStars['ships'][id]['w'], nStars['ships'][id]['h']);
+
+			// Schild aufblitzen lassen
+			// ========================
+			if( nStars['ships'][id]['flash'] > 0 )
+			{
+				shieldRadius  = ( nStars['ships'][id]['width'] >= nStars['ships'][id]['height'] ) ? nStars['ships'][id]['width'] : nStars['ships'][id]['height'];
+				shieldRadius  = shieldRadius * 0.5 * nStars['ships'][id]['size'];
+				shieldTrans   = 0.3 * ( 0.1 * nStars['ships'][id]['flash'] );
+
+				ctx.fillStyle = 'rgba(0, 100, 250, '+shieldTrans+')';
+				ctx.beginPath();
+				ctx.arc(nStars['ships'][id]['x'], nStars['ships'][id]['y'], shieldRadius, 0, 2*Math.PI, false);
+				ctx.fill();
+				ctx.closePath();
+
+				nStars['ships'][id]['flash']--;
+			}
+		}
+	}
+
+
+	// Gegner Treffer-Kollision prüfen
+	// *******************************
+	function nWarpShipHit(x, y)
+	{
+		if( nStars['enemies'] == 0 ) { return false; }
+
+		retVAlHit = 0;
+
+		for( sNr = 0; sNr < nStars['ships']['count']; sNr++ )
+		{
+			sdX = nStars['ships'][sNr]['x'] - ( nStars['ships'][sNr]['w'] / 2 );
+			sdY = nStars['ships'][sNr]['y'] - ( nStars['ships'][sNr]['h'] / 2 );
+
+			if( x >= sdX && x < ( sdX + nStars['ships'][sNr]['w'] ) && y >= sdY && y < ( sdY + nStars['ships'][sNr]['h'] ) )
+			{
+				retVAlHit = 1;
+
+				if( nStars['shot']['weapon'] == 'Phaser' )
+				{
+					// Wartezeit bei Dauerfeuer prüfen
+					// ===============================
+					isHit = ( nStars['ships']['wait'] > 0 ) ? 0 : 1;
+				} else
+				  {
+					isHit = 1;
+				  }
+
+				if( isHit == 1 )
+				{
+					// Wartezeit starten
+					// =================
+					nStars['ships']['wait'] = 50;
+
+					// Schaden beim Gegner berechnen
+					// =============================
+					if( nStars['ships'][sNr]['shield'] > 0 )
+					{
+						nStars['ships'][sNr]['shield'] = ( nStars['shot']['weapon'] == 'Torpedo' ) ? ( nStars['ships'][sNr]['shield'] - 2 ) : ( nStars['ships'][sNr]['shield'] - 1 );
+						nStars['ships'][sNr]['shield'] = ( nStars['ships'][sNr]['shield'] < 0 ) ? 0 : nStars['ships'][sNr]['shield'];
+						nStars['ships'][sNr]['flash']  = 10;
+					} else
+					  {
+						if( nStars['ships'][sNr]['hull'] > 0 )
+						{
+							nStars['ships'][sNr]['hull'] = ( nStars['shot']['weapon'] == 'Torpedo' ) ? ( nStars['ships'][sNr]['hull'] - 2 ) : ( nStars['ships'][sNr]['hull'] - 1 );
+							nStars['ships'][sNr]['hull'] = ( nStars['ships'][sNr]['hull'] < 0 ) ? 0 : nStars['ships'][sNr]['hull'];
+							nWarpExOn(x, y, 500);
+						} else
+						  {
+							// Eigene Abschuss-Punkte gutschreiben
+							// ===================================
+							if( nStars['schild'] > 0 )
+							{
+								nStars['schild'] += 3;
+								nStars['schild']  = ( nStars['schild'] > 100 ) ? 100 : nStars['schild'];
+							} else
+							  {
+								    nStars['rumpf'] += 3;
+								if( nStars['rumpf'] > 100 )
+								{
+									nStars['schild'] = nStars['rumpf'] - 100;
+									nStars['rumpf']  = 100;
+								}
+							  }
+
+							// Schiff explodieren lassen und neu initiieren
+							// ============================================
+							nWarpExOn(x, y, 2300);
+							nStars['ships']['hits']++;
+							nStars['ships'][sNr]['active'] = 0;
+							window.setTimeout("nWarpShipInit("+sNr+")", 5000);
+						  }
+					  }
+				}
+
+				break;
+			}
+		}
+
+		return ( retVAlHit == 1 ) ? 1 : 0;
+	}
+
+
+	// Gegner Schuss initialisieren
+	// ****************************
+	function nWarpShipShot(id)
+	{
+		if( nStars['enemies'] == 0 || nStars['gameOver'] != 0 ) { return false; }
+
+		if( Math.random() >= 0.8 )
+		{
+			// Treffer-Winkel, 20% der Schüsse sollen treffen
+			// ==============================================
+			schussWinkel = nStars['ships'][id]['alpha'] + Math.PI;
+			nStars['attack'][id]['treffer'] = 1;
+		} else
+		  {
+			// +- 20 Grad ( Pi / 10 ) am Spieler vorbei
+			// ========================================
+			schussWinkel = ( nStars['ships'][id]['alpha'] - ( 0.2 * Math.PI ) ) + ( Math.random() * 0.4 * Math.PI ) + Math.PI;
+			nStars['attack'][id]['treffer'] = 0;
+		  }
+		schussWinkel = ( schussWinkel > ( 2 * Math.PI ) ) ? schussWinkel - ( 2 * Math.PI ) : schussWinkel;
+
+		// Schuss Startposition
+		// ====================
+		nStars['attack'][id]['startX']  = nStars['ships'][id]['x'] - ( nStars['ships'][id]['w'] / 2 );
+		nStars['attack'][id]['startY']  = nStars['ships'][id]['y'] - ( nStars['ships'][id]['h'] / 2 );
+		nStars['attack'][id]['winkel']  = schussWinkel;
+		nStars['attack'][id]['strecke'] = 50;
+		nStars['attack'][id]['radius']  = 5;
+		nStars['attack'][id]['active']  = 1;
+	}
+
+
+	// Gegner Explosion einschalten (Bild anzeigen)
+	// ********************************************
+	function nWarpExOn(exX, exY, exTime)
+	{
+		clearTimeout(nStars['timerEx']);
+
+		document.getElementById('nWarpExplosion').innerHTML        = '<img src="explosion.gif" border="0">';
+		document.getElementById('nWarpExplosion').style.display    = 'block';
+		document.getElementById('nWarpExplosion').style.visibility = 'visible';
+		document.getElementById('nWarpExplosion').style.left       = ( exX - 30 ) + 'px';
+		document.getElementById('nWarpExplosion').style.top        = ( exY - 50 ) + 'px';
+
+		nStars['timerEx'] = window.setTimeout("nWarpExOff()", exTime);
+	}
+
+
+	// Gegner Explosion ausschalten (Bild verstecken)
+	// **********************************************
+	function nWarpExOff()
+	{
+		clearTimeout(nStars['timerEx']);
+
+		document.getElementById('nWarpExplosion').innerHTML        = '';
+		document.getElementById('nWarpExplosion').style.display    = 'none';
+		document.getElementById('nWarpExplosion').style.visibility = 'hidden';
+		document.getElementById('nWarpExplosion').style.left       = '0px';
+		document.getElementById('nWarpExplosion').style.top        = '0px';
+	}
+
+
+	// Hilfe anzeigen
+	// **************
+	function nWarpHelp()
+	{
+		if( nStars['help'] == 1 )
+		{
+			nStars['help'] = 0;
+
+			document.getElementById('nWarpHelpDiv').style.display    = ' none';
+			document.getElementById('nWarpHelpDiv').style.visibility = 'hidden';
+		} else
+		  {
+			nStars['help'] = 1;
+			centerX        = ( window.innerWidth  / 2 ) - ( parseInt(document.getElementById('nWarpHelpDiv').style.width, 10) / 2 );
+			centerY        = ( window.innerHeight / 2 ) - ( parseInt(document.getElementById('nWarpHelpDiv').style.height,10) / 2 );
+
+			document.getElementById('nWarpHelpDiv').style.left       = centerX+'px';
+			document.getElementById('nWarpHelpDiv').style.top        = centerY+'px'
+			document.getElementById('nWarpHelpDiv').style.display    = 'block';
+			document.getElementById('nWarpHelpDiv').style.visibility = 'visible';
+		  }
+	}
+
+
+	// Riss in der Scheibe hinzufügen
+	// ******************************
+	function nWarpCrack(anzahl)
+	{
+		nextCrack = nStars['crack'].length;
+		if( nextCrack < anzahl )
+		{
+			nextAlpha1 =                     Math.random() * Math.PI * 0.5;
+			nextAlpha2 = ( Math.PI * 0.5 ) + Math.random() * Math.PI * 0.5;
+			nextAlpha3 = ( Math.PI * 1.0 ) + Math.random() * Math.PI * 0.5;
+			nextAlpha4 = ( Math.PI * 1.5 ) + Math.random() * Math.PI * 0.5;
+
+			nextRange1 = 0.5 + ( 0.5 * Math.random() );
+			nextRange2 = 0.5 + ( 0.5 * Math.random() );
+			nextRange3 = 0.5 + ( 0.5 * Math.random() );
+			nextRange4 = 0.5 + ( 0.5 * Math.random() );
+
+			nStars['crack'][nextCrack]           = [];
+			nStars['crack'][nextCrack]['x']      = nStars['mpX'] - 10 + ( Math.random() * 20 );
+			nStars['crack'][nextCrack]['y']      = nStars['mpY'] - 10 + ( Math.random() * 20 );
+			nStars['crack'][nextCrack]['alpha']  = [nextAlpha1, nextAlpha2, nextAlpha3, nextAlpha4];
+			nStars['crack'][nextCrack]['range']  = [nextRange1, nextRange2, nextRange3, nextRange4];
+		}
+	}
+
+
+	// Spiel ist beendet
+	// *****************
+	function nWarpGameOver()
+	{
+		nStars['canvas'] = document.getElementById(nStars['id']);
+		ctx    = nStars['canvas'].getContext('2d');
+
+		if( nStars['resize'] == 1 )
+		{
+			nStars['canvas'].width  = window.innerWidth  - nStars['margin'];
+			nStars['canvas'].height = window.innerHeight - nStars['margin'];
+		}
+
+		ctx.lineWidth    = 1;
+		ctx.fillStyle    = '#000000';
+		ctx.clearRect(0, 0, nStars['canvas'].width, nStars['canvas'].height);
+		ctx.fillRect( 0, 0, nStars['canvas'].width, nStars['canvas'].height);
+		ctx.font         = 'bold italic 50px verdana';
+
+		goText           = 'Game Over';
+		goWidth          = ctx.measureText(goText).width;
+		goStart          = nStars['mpX']-(goWidth/2);
+		goHeight         = nStars['mpY'];
+
+		ctx.fillStyle    = 'rgb(255, 0, 0)';
+		ctx.fillText('Game Over', goStart, goHeight);
+		ctx.font         = 'bold italic 14px verdana';
+		ctx.fillStyle    = '#00FFFF';
+		ctx.fillText('www.numaek.de', nStars['mpX']-(ctx.measureText('www.numaek.de').width/2), goHeight+75);
+
+		nStars['goPos'] += 4;
+		nStars['goPos']  = ( nStars['goPos'] >= goWidth ) ? -( goWidth / 2 ) : nStars['goPos'];
+
+		if( nStars['goPos'] >= 0 )
+		{
+			// Stern animieren
+			// ===============
+			sInner             = 4;
+			sOuter             = 12;
+			sPeaks             = 8;
+			sXpoint            = goStart + nStars['goPos'];
+			sYpoint            = goHeight+15;
+			nStars['starRot'] += 0.2;
+			nStars['starRot']  = ( nStars['starRot'] >= ( 2 * Math.PI ) ) ? 0 : nStars['starRot'];
+			starX              = sXpoint + Math.cos( nStars['starRot'] ) * sOuter;
+			starY              = sYpoint + Math.sin( nStars['starRot'] ) * sOuter;
+			grd                = ctx.createRadialGradient(sXpoint, sYpoint, 2, sXpoint, sYpoint, 15);
+			grd.addColorStop(0 ,  'rgba(255, 255, 255, 1)');
+			grd.addColorStop(0.7, 'rgba(255,   0,   0, 1)');
+			grd.addColorStop(1,   'rgba(  0,   0,   0, 1)');
+			ctx.fillStyle      =   grd;
+			ctx.strokeStyle    =  'rgb(255, 0, 0)';
+			ctx.beginPath(); ctx.moveTo(starX, starY);
+			for( sp = 1; sp <= sPeaks; sp++ )
+			{
+				// Vom inneren zum äußeren Durchmesser je Schrittwinkel zeichnen
+				// =============================================================
+				schrittWinkel = ( 2 * Math.PI ) / ( sPeaks * 2 );
+				winkel2       =  ( schrittWinkel * sp * 2 )  + nStars['starRot'];
+				winkel1       =  ( winkel2 - schrittWinkel );
+				starX         = sXpoint + Math.cos( winkel1 ) * sInner;
+				starY         = sYpoint + Math.sin( winkel1 ) * sInner;
+				ctx.lineTo(starX, starY);
+				starX         = sXpoint + Math.cos( winkel2 ) * sOuter;
+				starY         = sYpoint + Math.sin( winkel2 ) * sOuter;
+				ctx.lineTo(starX, starY);
+			}
+			ctx.stroke(); ctx.fill(); ctx.closePath();
+		}
+
+		if( nStars['gameOver'] != 0 )
+		{
+			window.setTimeout("nWarpGameOver()", nStars['delay']);
+		}
+	}
+
+	document.onload = window.setTimeout("nWarp()", 100);
+
+ </script>
+
+
+ <canvas id="myCanvas" width="800" height="500" style="border: 0px solid white; cursor: crosshair;"></canvas><br>
+
+ <div id="nWarpHelpDiv" style="position: absolute; display: none; visiblity: hidden; left: 50px; top: 50px; width: 330px; height: 250px; padding: 5px; background-color: rgba(255, 0, 0, 0.2); color: #00FFFF; font-family: verdana; font-size: 10pt; border: 1px solid #00FFFF;">
+	<div style="text-align: center; font-weight: bold; text-decoration: underline; font-size: 12pt;">Tastensteuerung zum Warpflug</div>
+	<br>
+	Taste "P" zum Pausieren der Hauptfunktion<br>
+	<br>
+	Taste "F" zur Umschaltung der Farben<br>
+	Taste "V" zur Umschaltung der Streifen<br>
+	<br>
+	Taste "G" zum Ein- und Ausschalten der Gegner<br>
+	Taste "SPACE" zur Umschaltung der Waffen<br>
+	<br>
+	Taste "E" zum schneller fliegen<br>
+	Taste "Q" zum langsamer fliegen<br>
+	<br>
+	Flugsteuerung mit Pfeiltasten oder WASD<br>
+	<br>
+ </div>
+
+ <div id="nWarpExplosion" style="position: absolute; display: none; visiblity: hidden; left: 0px; top: 0px; width: 70px; height: 100px; border: 0px solid #00FFFF;"></div>
+
+ </body>
+</html>
